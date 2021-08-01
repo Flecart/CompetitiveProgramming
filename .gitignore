@@ -1,0 +1,9 @@
+# Dont want files withouth extension 
+*
+!/**/
+!*.*
+
+
+output.txt
+input.txt
+.vscode/
