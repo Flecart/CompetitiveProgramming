@@ -7,3 +7,9 @@
 output.txt
 input.txt
 .vscode/
+
+
+__pycache__
+*.py
+*.out
+.cph/
