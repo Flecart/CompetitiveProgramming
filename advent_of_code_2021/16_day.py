@@ -100,7 +100,6 @@ class Packet():
     
 
 def process(binaryString:str):
-  # assert(len(binaryString) >= 3 + 3 + 5)
   
   def _get_version(binary:str)->int:
     return int(binary[:3], 2)
@@ -159,14 +158,6 @@ def process(binaryString:str):
   if(packet.data==None):
     pdb.set_trace()
   return (lastIndex,packet)
-
-
-def first_star_ric(packet):
-  res:int = packet.version
-  if packet.id != 4:
-    for i in packet.data:
-      res+=first_star(i)
-  return res
 
 def first_star(packet):
   from queue import Queue 
