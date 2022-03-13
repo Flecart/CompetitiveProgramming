@@ -1,6 +1,3 @@
-// this is the library for computational geometry
-// i began after watching some lectures about it, it should
-// be simpler to use than the other one
 #include <bits/stdc++.h>
 
 using namespace std;
@@ -63,7 +60,6 @@ ll get_sign(ll n) {
     else return -1;
 }
 
-// returns true if segments a-b, c-d are intersecting (doesn't count for edge cases)
 bool is_intersecting(const pt &a, const pt &b, const pt &c, const pt &d) {
     if (get_sign((a - c) ^ (b - c)) * get_sign((a - d) ^ (b - d)) < 0 
             and 
@@ -86,4 +82,48 @@ bool is_internal_collinear(const pt &seg_start, const pt &seg_finish, const pt &
             return true;
         }
     else return false;
+}
+
+/* POLIGON AREA:
+The main idea is to count the intersections with a point at infinite.
+Clearly if i intersect the polygon even times, then i'm entering, exiting, so the point is
+outside, else, the point is inside because i'm still not out after i entered the poly 1 time.
+
+It is fundamental that the point at infinite is actually outside the polygon (otherwise, 
+it's not at infinite xD).
+Then i check if its on one of its boundaries, if it is, i exit immediately after result
+*/
+
+const pt outside((ll) 1e9 + 7, (ll) 1e9 + 9);
+
+void solve(vector<pt> &polygon) {
+    int a, b;
+    cin >> a >> b;
+    pt point(a, b);
+    int count = 0;
+    for (uint i = 1; i <= polygon.size(); i++) {
+        if (is_internal_collinear(polygon[i - 1], polygon[i % polygon.size()], point)) {
+            cout << "BOUNDARY\n";
+            return;
+        } else if (is_intersecting(polygon[i - 1], polygon[i % polygon.size()], point, outside)) {
+            count++;
+        }
+    }
+
+    if (count & 1) cout << "INSIDE\n";
+    else cout << "OUTSIDE\n";
+}
+
+int main() {
+    int n,m; cin >> n >> m;
+    vector<pt> vpt(n);
+    for (int i = 0; i < n; i++) {
+        int a, b;
+        cin >> a >> b;
+        vpt[i] = pt(a, b);
+    }
+
+    while (m--) {
+        solve(vpt);
+    }
 }
