@@ -44,10 +44,15 @@ pt operator /(const pt &a, ll n) {
     return pt(a.x / n, a.y / n);
 }
 
+bool operator !=(const pt &a, const pt &b) {
+    return a.x != b.x and a.y != b.y;
+}
+
 ostream& operator <<(ostream &out, const pt point) {
     return out << "[" << point.x << ", " << point.y << "]";
 }
 
+/*
 // ordinamento per l'angolo
 bool pt::operator <(const pt &other) const {
     if (this->y * other.y < 0) { // uno sopra l'altro sotto
@@ -56,11 +61,22 @@ bool pt::operator <(const pt &other) const {
         return (*this ^ other) > 0; // vedere se other sta a sinistra di this
     }
 }
+*/
+
+// ordinamento per prima coordinata
+bool pt::operator <(const pt &other) const {
+    if (this->x != other.x) return this->x < other.x;
+    else return this->y < other.y;
+}
 
 ll get_sign(ll n) {
     if (n > 0) return 1;
     else if (n == 0) return 0;
     else return -1;
+}
+
+ll cross_product(const pt &first, const pt &middle, const pt &last) {
+    return ((first - middle) ^ (last - middle));
 }
 
 // returns true if segments a-b, c-d are intersecting (doesn't count for edge cases)
