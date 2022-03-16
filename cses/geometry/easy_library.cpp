@@ -103,3 +103,28 @@ bool is_internal_collinear(const pt &seg_start, const pt &seg_finish, const pt &
         }
     else return false;
 }
+
+ll double_area(vector<pt> &polygon) {
+    ll result = 0;
+    for (uint i = 0; i < polygon.size() - 1; i++) {
+        result += polygon[i] ^ polygon[i + 1];
+    }
+    return abs(result + (polygon[polygon.size() - 1] ^ polygon[0]));
+}
+
+ll gcd(ll a, ll b) {
+    if (a < b) swap(a, b);
+    while (true) {
+        a = a % b; swap(a, b);
+        if (b == 0) return a;
+    }
+}
+
+// calculates number of lattice points between two points
+ll line_lattice(pt a, pt b) {
+    // https://math.stackexchange.com/questions/301890/how-many-points-between-two-points
+    if (a.x == b.x) return abs(b.y - a.y) - 1;
+    if (a.y == b.y) return abs(b.x - a.x) - 1;
+    b = b - a; // translation
+    return gcd(abs(b.x), abs(b.y)) - 1;
+}
