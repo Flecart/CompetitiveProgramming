@@ -2,52 +2,41 @@
 
 using namespace std;
 
-typedef pair<int,int> pii;
-typedef long long ll;
-typedef unsigned long long ull;
-typedef long double ld;
-typedef vector<int> vi;
-typedef vector<pii> vii;
-
-#define vc vector
-#define pb push_back
-#define F first
-#define S second
-#define nl cout<<'\n'
-#define E cerr<<'\n'
-#define all(x) x.begin(),x.end()
-#define rep(i,a,b) for (int i=a; i<b; ++i)
-#define rev(i,a,b) for (int i=a; i>b; --i)
-#define IOS ios_base::sync_with_stdio(false)
-#define setpr(x) cout<<setprecision(x)<<fixed
-#define sz size()
-#define cspace << ' ' <<
-#ifndef FILE
-#define seea(a,x,y) for(int i=x;i<y;i++){cin>>a[i];}
-#define seev(v,n) for(int i=0;i<n;i++){int x; cin>>x; v.push_back(x);}
-#define sees(s,n) for(int i=0;i<n;i++){int x; cin>>x; s.insert(x);}
-#define prepare(x) int x; cin >>x;
-#else 
-#define seea(a,x,y) for(int i=x;i<y;i++){fin>>a[i];}
-#define seev(v,n) for(int i=0;i<n;i++){int x; fin>>x; v.push_back(x);}
-#define sees(s,n) for(int i=0;i<n;i++){int x; fin>>x; s.insert(x);}
-#define prepare(x) int x; fin >> x;
-#endif
-//----------CONSTANTS----------
-const int inf = INT_MAX;
-const ll linf = LLONG_MAX;
-const ld ep = 0.0000001;
-const ld pi = acos(-1.0);
-const ll mod = 1000000007;
-
-int cost[1000];
-int pages[1000];
+/* BOOK SHOP:
+i use an array to store the best solutions of the step before.
+This is standard knapsack 1/0.
+i update this array as needed (if the solution is better i keep this sol
+else i keep the older one).
+*/
 
 int main()
 {
-    IOS;
-    prepare(n);
-    prepare(budget);
-    
+    int n, x; cin >> n >> x;
+    vector<int> price(n), pages(n);
+    for (int i = 0; i < n; i++) {
+        cin >> price[i];
+    }
+    for (int i = 0; i < n; i++) {
+        cin >> pages[i];
+    }
+    int memo[2][x];
+
+    for (int i = 0; i < x; i++) memo[0][i] = 0;
+    int max_value = 0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j <= x; j++) {
+            // fill the table in a dynamic way.
+            int last_price = j - price[i]; 
+            int &update_cell = memo[(i + 1) % 2][j];
+            if (last_price < 0) {
+                last_price = 0;
+                update_cell = memo[i % 2][j];
+            } else {
+                update_cell = max(memo[i % 2][j], pages[i] + memo[i % 2][last_price]);
+            }
+            if (update_cell > max_value) max_value = update_cell;
+        }
+    }     
+    cout << max_value << endl;
     return 0;
 }
