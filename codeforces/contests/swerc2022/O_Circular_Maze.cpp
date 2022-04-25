@@ -8,34 +8,34 @@ typedef long long ll;
 int table[MAXROW][MAXCIRC];
 bool visited[MAXROW][MAXCIRC];
 
-inline void wall_up(int grade, int circ) {
+void wall_up(int grade, int circ) {
     table[grade][circ] |= (1 << 3);
 }
-inline void wall_left(int grade, int circ) {
+void wall_left(int grade, int circ) {
     table[grade][circ] |= (1 << 2);
 }
 
-inline void wall_right(int grade, int circ) {
+void wall_right(int grade, int circ) {
     table[grade][circ] |= (1 << 1);
 }
 
-inline void wall_down(int grade, int circ) {
+void wall_down(int grade, int circ) {
     table[grade][circ] |= 1;
 }
 
-inline bool get_wall_up(int grade, int circ) {
+bool get_wall_up(int grade, int circ) {
     return (table[grade][circ] >> 3) & 1;
 }
 
-inline bool get_wall_left(int grade, int circ) {
+bool get_wall_left(int grade, int circ) {
     return (table[grade][circ] >> 2) & 1;
 }
 
-inline bool get_wall_right(int grade, int circ) {
+bool get_wall_right(int grade, int circ) {
     return (table[grade][circ] >> 1) & 1;
 }
 
-inline bool get_wall_down(int grade, int circ) {
+bool get_wall_down(int grade, int circ) {
     return (table[grade][circ] & 1);
 }
 
