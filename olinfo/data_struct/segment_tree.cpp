@@ -15,29 +15,14 @@ constexpr int right(int n) {
     return (n + 1) * 2;
 }
 
-constexpr int parent(int n) {
-    return (n + 1) / 2 - 1;
-}
-
-struct mypair {
-    ll sum;
-    ll mmin;
-    mypair() {}
-    mypair(ll n): sum{n}, mmin{n} {}
-    mypair(ll s, ll m): sum{s}, mmin{m}{}
-    mypair operator+(const mypair &other) const {
-        return {sum + other.sum, min(mmin, other.mmin)};
-    }
-};
-
 vector<pair<int, int>> ranges(kmax);
 vector<ll> mins(kmax);
 vector<ll> sums(kmax); 
 vector<ll> original(kmax);
 vector<ll> lazy_add(kmax, 0); 
 vector<ll> lazy_set(kmax, inf); 
-vector<ll> time_set(kmax); 
-vector<ll> time_add(kmax); 
+vector<int> time_set(kmax); 
+vector<int> time_add(kmax); 
 int g_size;
 
 void build(int v, int l, int r, const vector<ll> &original) {
@@ -55,11 +40,27 @@ void build(int v, int l, int r, const vector<ll> &original) {
     sums[v] = sums[left(v)] + sums[right(v)];
 }
 
+// fixo il nodo in cui ha attivo sia set e add in lazy
+void fix_add_times(int v) {
+    if (lazy_add[v] == 0 or lazy_set[v] == inf) return; // devono essere entrambi attivi per avere senso
+    if (time_set[v] > time_add[v]) {
+        // just overwrite the add!
+        lazy_add[v] = 0; 
+    } else {
+        lazy_set[v] += lazy_add[v];
+        lazy_add[v] = 0; 
+    }
+}
+
 void update_add(int v) {
     sums[v] += lazy_add[v] * (ranges[v].second - ranges[v].first + 1); 
     mins[v] += lazy_add[v];
     int mid = (ranges[v].first + ranges[v].second) / 2;
     if (v < sums.size() / 2) {
+        // può succedere che ci sia un set prima nel figlio??
+        // credo di sì
+        fix_add_times(left(v));
+        fix_add_times(right(v));
         lazy_add[left(v)] += lazy_add[v];
         lazy_add[right(v)] += lazy_add[v];
         time_add[right(v)] = time_add[left(v)] = time_add[v];
@@ -90,70 +91,72 @@ void lazy_update(int v) {
         return;
     }
     // both active from here on:
-    if (time_set[v] > time_add[v]) {
-        // just overwrite the add!
-        update_set(v);
-    } else {
-        lazy_set[v] += lazy_add[v];
-        update_set(v);
-    }
-    lazy_add[v] = 0; 
+    fix_add_times(v);
+    update_set(v);
 }
 
 void add(int v, int tl, int tr, int l, int r, ll x) {
-    lazy_update(v);
     if (tl > r or tr < l) return; 
     if (l <= tl and tr <= r) {
-        lazy_add[v] = x;
+        fix_add_times(v);
+        lazy_add[v] += x;
         time_add[v] = g_time++;
-        update_add(v);
+        lazy_update(v);
         return;
     }
-
+    lazy_update(v);
     int mid = (tl + tr) / 2;
     add(left(v), tl, mid, l, r, x);
     add(right(v), mid + 1, tr, l ,r, x);
-    
+    lazy_update(left(v)); // mi servono entrambi i figli aggiornati
+    lazy_update(right(v)); 
     mins[v] = min(mins[left(v)], mins[right(v)]);
     sums[v] = sums[left(v)] + sums[right(v)];
 }
 
 void set_range(int v, int tl, int tr, int l, int r, ll x) {
-    lazy_update(v);
     if (tl > r or tr < l) return; 
     if (l <= tl and tr <= r) {
         lazy_set[v] = x;
         time_set[v] = g_time++;
-        update_set(v);
+        lazy_update(v);
         return;
     }
+    lazy_update(v);
 
     int mid = (tl + tr) / 2;
     set_range(left(v), tl, mid, l, r, x);
     set_range(right(v), mid + 1, tr, l ,r, x);
     
+    lazy_update(left(v)); // mi servono entrambi i figli aggiornati
+    lazy_update(right(v)); 
     mins[v] = min(mins[left(v)], mins[right(v)]);
     sums[v] = sums[left(v)] + sums[right(v)];
 }
 
 ll get_sum(int v, int l, int r, int tl, int tr) {
-    lazy_update(v);
     if (tr < l or tl > r) return 0ll;
     if (l <= tl and tr <= r) {
+        lazy_update(v);
         return sums[v];
     }
     int mid = (tl + tr) / 2;
+
+    lazy_update(left(v)); // mi servono entrambi i figli aggiornati
+    lazy_update(right(v)); 
     return get_sum(left(v), l, r, tl, mid) + 
         get_sum(right(v), l, r, mid + 1, tr);
 }
 
 ll get_min(int v, int l, int r, int tl, int tr) {
-    lazy_update(v);
     if (tr < l or tl > r) return inf; 
     if (l <= tl and tr <= r) {
+        lazy_update(v);
         return mins[v];
     }
     int mid = (tl + tr) / 2;
+    lazy_update(left(v)); // mi servono entrambi i figli aggiornati
+    lazy_update(right(v)); 
     return min(get_min(left(v), l, r, tl, mid),
             get_min(right(v), l, r, mid + 1, tr));
 }
@@ -175,7 +178,6 @@ int get_first(int v, int lv, int rv, int l, int r, ll x) {
                 v = right(v);
                 lv = mid+1;
             }
-
         }
         return lv;
     }
