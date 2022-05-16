@@ -1,244 +1,212 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-
 using namespace std;
 typedef long long ll;
-const ll inf = 1e17;
-int left(int n) {
+const ll inf = 1e15;
+const int kmax = 4 * 1e6 + 5;
+int g_time;
+
+constexpr int left(int n) {
     return (n + 1) * 2 - 1;
 }
 
-int right(int n) {
+constexpr int right(int n) {
     return (n + 1) * 2;
 }
 
-int parent(int n) {
+constexpr int parent(int n) {
     return (n + 1) / 2 - 1;
 }
 
 struct mypair {
     ll sum;
     ll mmin;
-    int idx; // index for the lower bound
     mypair() {}
-    mypair(ll n, int i): sum{n}, mmin{n}, idx{i} {}
+    mypair(ll n): sum{n}, mmin{n} {}
     mypair(ll s, ll m): sum{s}, mmin{m}{}
     mypair operator+(const mypair &other) const {
         return {sum + other.sum, min(mmin, other.mmin)};
     }
 };
 
-struct ST {
-    vector<mypair> t; // tree (sum, min)
-    vector<ll> original;
-    vector<ll> lazy_add; 
-    vector<ll> lazy_min; 
-    vector<ll> lazy_set;
-    vector<ll> lazy_value;
-    int default_set;
-    void build(int v, int l, int r) {
-        if (l == r) {
-            t[v] = mypair(original[l], l);
-            return;
-        }
+vector<pair<int, int>> ranges(kmax);
+vector<ll> mins(kmax);
+vector<ll> sums(kmax); 
+vector<ll> original(kmax);
+vector<ll> lazy_add(kmax, 0); 
+vector<ll> lazy_set(kmax, inf); 
+vector<ll> time_set(kmax); 
+vector<ll> time_add(kmax); 
+int g_size;
 
-        int mid = (l + r) / 2;
-        build(left(v), l, mid);
-        build(right(v), mid + 1, r);
-        t[v] = t[left(v)] + t[right(v)]; 
+void build(int v, int l, int r, const vector<ll> &original) {
+    ranges[v] = {l, r};
+    if (l == r) {
+        mins[v] = original[l];
+        sums[v] = original[l];
+        return;
     }
 
-    ST(vector<ll> &arr) {
-        default_set = 1e9;
-        int size = arr.size() * 4 + 1; 
-        t.assign(size, mypair(0, inf));
-        original = arr;
-        build(0, 0, original.size() - 1);
+    int mid = (l + r) / 2;
+    build(left(v), l, mid, original);
+    build(right(v), mid + 1, r, original);
+    mins[v] = min(mins[left(v)], mins[right(v)]);
+    sums[v] = sums[left(v)] + sums[right(v)];
+}
 
-        lazy_set.assign(size, default_set); // offset of range set
-        lazy_value.assign(size, default_set); // offset of single set
-        lazy_add.assign(size, 0); // offset of range
-        lazy_min.assign(size, 0); // offset of single
+void update_add(int v) {
+    sums[v] += lazy_add[v] * (ranges[v].second - ranges[v].first + 1); 
+    mins[v] += lazy_add[v];
+    int mid = (ranges[v].first + ranges[v].second) / 2;
+    if (v < sums.size() / 2) {
+        lazy_add[left(v)] += lazy_add[v];
+        lazy_add[right(v)] += lazy_add[v];
+        time_add[right(v)] = time_add[left(v)] = time_add[v];
+    }
+    lazy_add[v] = 0;
+}
+
+void update_set(int v) {
+    sums[v] = lazy_set[v] * (ranges[v].second - ranges[v].first + 1); 
+    mins[v] = lazy_set[v];
+    int mid = (ranges[v].first + ranges[v].second) / 2;
+    if (v < sums.size() / 2) {
+        lazy_set[left(v)] = lazy_set[v];
+        lazy_set[right(v)] = lazy_set[v];
+        time_set[left(v)] = time_set[right(v)] = time_set[v];
+    }
+    lazy_set[v] = inf;
+}
+
+void lazy_update(int v) {
+    if (lazy_add[v] == 0 and lazy_set[v] == inf) return;
+    if (lazy_set[v] == inf) {
+        update_add(v);
+        return;
+    }
+    if (lazy_add[v] == 0) {
+        update_set(v);
+        return;
+    }
+    // both active from here on:
+    if (time_set[v] > time_add[v]) {
+        // just overwrite the add!
+        update_set(v);
+    } else {
+        lazy_set[v] += lazy_add[v];
+        update_set(v);
+    }
+    lazy_add[v] = 0; 
+}
+
+void add(int v, int tl, int tr, int l, int r, ll x) {
+    lazy_update(v);
+    if (tl > r or tr < l) return; 
+    if (l <= tl and tr <= r) {
+        lazy_add[v] = x;
+        time_add[v] = g_time++;
+        update_add(v);
+        return;
     }
 
-    void update_to_root(int v) {
-        while (v > 0) {
-            t[v] = t[left(v)] + t[right(v)];
-            v = parent(v);
-        }
-    }
-
-    ll get_sum(int v, int l, int r, int tl, int tr) {
-        if (tr < l or tl > r) return 0ll;
-        lazy_update(v);
-        if (l <= tl and tr <= r) {
-            return t[v].sum;
-        }
-        int mid = (tl + tr) / 2;
-        ll sum = 0;
-        sum += get_sum(left(v), l, r, tl, mid);
-        sum += get_sum(right(v), l, r, mid + 1, tr);
-        return sum;
-    }
-    ll get_sum(int l, int r) {
-        return get_sum(0, l, r - 1, 0, original.size() - 1);
-    }
-
-    void flazy_add(int v) {
-        if (lazy_add[v] == 0) return;
-        t[v].sum += lazy_add[v];
-        t[v].mmin += lazy_min[v];
-
-        if (v < t.size() / 2) {
-            lazy_update(left(v));
-            lazy_update(right(v));
-
-            lazy_add[left(v)] += lazy_add[v] / 2;
-            lazy_add[right(v)] += lazy_add[v] / 2;
-            lazy_min[left(v)] += lazy_min[v];
-            lazy_min[right(v)] += lazy_min[v];
-        }
-        lazy_add[v] = 0;
-        lazy_min[v] = 0;
-    }
-
-    void flazy_set(int v) {
-        if (lazy_set[v] == default_set) return;
-        t[v].sum = lazy_set[v];
-        t[v].mmin = lazy_value[v];
-
-        if (v < t.size() / 2) {
-            lazy_update(left(v));
-            lazy_update(right(v));
-
-            lazy_set[left(v)] = lazy_set[v] / 2;
-            lazy_set[right(v)] = lazy_set[v] / 2;
-            lazy_value[left(v)] = lazy_value[v];
-            lazy_value[right(v)] = lazy_value[v];
-        }
-
-        lazy_set[v] = default_set;
-        lazy_value[v] = default_set;
-    }
-
-    void lazy_update(int v) {
-        flazy_add(v);
-        flazy_set(v);
-    }
-
-    void add(int v, int tl, int tr, int l, int r, ll x) {
-        if (tl > r or tr < l) return; 
-        lazy_update(v);
-        if (l <= tl and tr <= r) {
-            lazy_add[v] = x * (tr - tl + 1);
-            lazy_min[v] = x;
-            lazy_update(v);
-            return;
-        }
-
-        int mid = (tl + tr) / 2;
-        add(left(v), tl, mid, l, r, x);
-        add(right(v), mid + 1, tr, l ,r, x);
-        t[v] = t[left(v)] + t[right(v)];
-    }
+    int mid = (tl + tr) / 2;
+    add(left(v), tl, mid, l, r, x);
+    add(right(v), mid + 1, tr, l ,r, x);
     
-    void add(int l, int r, ll x) {
-        add(0, 0, original.size() - 1, l, r - 1, x);
+    mins[v] = min(mins[left(v)], mins[right(v)]);
+    sums[v] = sums[left(v)] + sums[right(v)];
+}
+
+void set_range(int v, int tl, int tr, int l, int r, ll x) {
+    lazy_update(v);
+    if (tl > r or tr < l) return; 
+    if (l <= tl and tr <= r) {
+        lazy_set[v] = x;
+        time_set[v] = g_time++;
+        update_set(v);
+        return;
     }
 
-    void set_range(int v, int tl, int tr, int l, int r, ll x) {
-        if (tl > r or tr < l) return; 
-        lazy_update(v);
-        if (l <= tl and tr <= r) {
-            lazy_set[v] = x * (tr - tl + 1);
-            lazy_value[v] = x;
-            lazy_update(v);
-            return;
-        }
+    int mid = (tl + tr) / 2;
+    set_range(left(v), tl, mid, l, r, x);
+    set_range(right(v), mid + 1, tr, l ,r, x);
+    
+    mins[v] = min(mins[left(v)], mins[right(v)]);
+    sums[v] = sums[left(v)] + sums[right(v)];
+}
 
-        int mid = (tl + tr) / 2;
-        set_range(left(v), tl, mid, l, r, x);
-        set_range(right(v), mid + 1, tr, l ,r, x);
-        t[v] = t[left(v)] + t[right(v)];
+ll get_sum(int v, int l, int r, int tl, int tr) {
+    lazy_update(v);
+    if (tr < l or tl > r) return 0ll;
+    if (l <= tl and tr <= r) {
+        return sums[v];
     }
+    int mid = (tl + tr) / 2;
+    return get_sum(left(v), l, r, tl, mid) + 
+        get_sum(right(v), l, r, mid + 1, tr);
+}
 
-    void set_range(int l, int r, ll x) {
-        set_range(1, 0, original.size() - 1, l, r - 1, x);
+ll get_min(int v, int l, int r, int tl, int tr) {
+    lazy_update(v);
+    if (tr < l or tl > r) return inf; 
+    if (l <= tl and tr <= r) {
+        return mins[v];
     }
+    int mid = (tl + tr) / 2;
+    return min(get_min(left(v), l, r, tl, mid),
+            get_min(right(v), l, r, mid + 1, tr));
+}
 
-    ll get_min(int v, int l, int r, int tl, int tr) {
-        if (tr < l or tl > r) return inf; 
-        lazy_update(v);
-        if (l <= tl and tr <= r) {
-            return t[v].mmin;
-        }
-        int mid = (tl + tr) / 2;
-        ll mmin = inf;
-        mmin = min(mmin, get_min(left(v), l, r, tl, mid));
-        mmin = min(mmin, get_min(right(v), l, r, mid + 1, tr));
-        return mmin;
-    }
 
-    ll get_min(int l, int r) {
-        return get_min(0, l, r - 1, 0, original.size() - 1);
-    }
-
-    int get_first(int v, int lv, int rv, int l, int r, ll x) {
-        if(lv > r || rv < l) return -1;
-        lazy_update(v);
-        if(l <= lv && rv <= r) {
-            if(t[v].mmin >= x) return -1;
-            while(lv != rv) {
-                int mid = lv + (rv-lv)/2;
-                if(t[left(v)].mmin < x) {
-                    v = left(v);
-                    rv = mid;
-                }else {
-                    v = right(v);
-                    lv = mid+1;
-                }
+int get_first(int v, int lv, int rv, int l, int r, ll x) {
+    lazy_update(v);
+    if(lv > r || rv < l) return -1;
+    if(l <= lv && rv <= r) {
+        if(mins[v] > x) return -1;
+        while(lv != rv) {
+            int mid = lv + (rv-lv)/2;
+            lazy_update(left(v));
+            lazy_update(right(v));
+            if(mins[left(v)] < x) {
+                v = left(v);
+                rv = mid;
+            } else {
+                v = right(v);
+                lv = mid+1;
             }
-            return lv;
+
         }
-
-        int mid = lv + (rv-lv)/2;
-        int rs = get_first(left(v), lv, mid, l, r, x);
-        if(rs != -1) return rs;
-        return get_first(right(v), mid+1, rv, l ,r, x);
+        return lv;
     }
 
-    int get_first(int l, int r, ll x) {
-        return get_first(0, 0, original.size() - 1, l, r - 1, x);
-    }
-};
+    int mid = lv + (rv-lv)/2;
+    int rs = get_first(left(v), lv, mid, l, r, x);
+    if(rs != -1) return rs;
+    return get_first(right(v), mid+1, rv, l, r, x);
+}
 
-ST *tree;
+ll get_sum(int l, int r) {
+    return get_sum(0, l, r - 1, 0, g_size - 1);
+}
+void add(int l, int r, ll x) {
+    add(0, 0, g_size - 1, l, r - 1, x);
+}
+void set_range(int l, int r, ll x) {
+    set_range(0, 0, g_size - 1, l, r - 1, x);
+}
+ll get_min(int l, int r) {
+    return get_min(0, l, r - 1, 0, g_size - 1);
+}
+int lower_bound(int l, int r, ll x) {
+    return get_first(0, 0, g_size - 1, l, r - 1, x);
+}
 
 void init(vector<long long> a) {
-	tree = new ST(a);
+    g_size = a.size(); 
+    build(0, 0, g_size - 1, a);
+    g_time = 0;
 }
-
-long long get_sum(int l, int r) {
-	return tree->get_sum(l, r);
-}
-
-void add(int l, int r, long long x) {
-    tree->add(l, r, x);
-}
-
-void set_range(int l, int r, long long x) {
-	tree->set_range(l, r, x);
-}
-
-long long get_min(int l, int r) {
-	return tree->get_min(l, r);
-}
-
-int lower_bound(int l, int r, long long x) {
-	return tree->get_first(l, r, x);
-}
-
 
 int main() {
 	ios::sync_with_stdio(false);
