@@ -1,4 +1,4 @@
-#pragma GCC optimize("Ofast,unroll-loops")
+#pragma GCC optimize("O2,unroll-loops")
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -6,8 +6,7 @@
 using namespace std;
 typedef long long ll;
 const ll inf = 1e15;
-const int kmax = 4 * 1e6 + 1;
-int g_time;
+const int kmax = (1 << 21);
 
 constexpr int left(int n) {
     return n * 2 + 1;
@@ -17,137 +16,157 @@ constexpr int right(int n) {
     return n * 2 + 2;
 }
 
+struct node {
+    ll mmin;
+    ll sum;
+    node (ll mmin, ll sum) {
+        this->mmin = mmin;
+        this->sum = sum;
+    }
+
+    node (ll coso) {
+        mmin = sum = coso;
+    }
+    node() {}
+
+    void operator +=(const node &other) {
+        mmin = min(mmin, other.mmin);
+        sum += other.sum;
+    }
+
+    node operator +(const node &other) const {
+        return {min(mmin, other.mmin), sum + other.sum};
+    }
+};
+
+struct lazy_node {
+    ll x; // the value 
+    bool is_set; // either set, or add
+};
+
 pair<int, int> ranges[kmax];
-ll mins[kmax];
-ll sums[kmax]; 
-ll lazy[kmax]; 
-vector<bool> is_set(kmax); 
+node nodes[kmax];
+lazy_node lazy[kmax];
 int g_tree_size;
 int g_size;
+int l, r; // gli l e r della chiamata!
 
 void build(int v, int l, int r, const vector<ll> &original) {
     ranges[v] = {l, r};
     if (l == r) {
-        mins[v] = original[l];
-        sums[v] = original[l];
+        nodes[v] = node(original[l]);
         return;
     }
 
     int mid = (l + r) / 2;
     build(left(v), l, mid, original);
     build(right(v), mid + 1, r, original);
-    mins[v] = min(mins[left(v)], mins[right(v)]);
-    sums[v] = sums[left(v)] + sums[right(v)];
+    nodes[v] = nodes[left(v)] + nodes[right(v)];
 }
 
 void update_add(int v) {
-    sums[v] += lazy[v] * (ranges[v].second - ranges[v].first + 1); 
-    mins[v] += lazy[v];
-    int mid = (ranges[v].first + ranges[v].second) / 2;
+    nodes[v].sum += lazy[v].x * (ranges[v].second - ranges[v].first + 1); 
+    nodes[v].mmin += lazy[v].x;
     if (v < g_tree_size / 2) {
-        if (lazy[left(v)] == inf) lazy[left(v)] = 0;
-        if (lazy[right(v)] == inf) lazy[right(v)] = 0;
-        lazy[left(v)] += lazy[v];
-        lazy[right(v)] += lazy[v];
+        if (lazy[left(v)].x == inf) lazy[left(v)].x = 0;
+        if (lazy[right(v)].x == inf) lazy[right(v)].x = 0;
+        lazy[left(v)].x += lazy[v].x;
+        lazy[right(v)].x += lazy[v].x;
         // se figli sono nodi di set, continua a settare a un valore aggiunto
         // altrimenti la flag resta false, quindi sommo
     }
-    lazy[v] = inf;
+    lazy[v].x = inf;
 }
 
 void update_set(int v) {
-    sums[v] = lazy[v] * (ranges[v].second - ranges[v].first + 1); 
-    mins[v] = lazy[v];
-    int mid = (ranges[v].first + ranges[v].second) / 2;
+    nodes[v].sum = lazy[v].x * (ranges[v].second - ranges[v].first + 1); 
+    nodes[v].mmin = lazy[v].x;
     if (v < g_tree_size / 2) {
         lazy[left(v)] = lazy[v];
         lazy[right(v)] = lazy[v];
-        is_set[left(v)] = is_set[right(v)] = true; 
+        lazy[left(v)].is_set = lazy[right(v)].is_set = true;
     }
-    is_set[v] = false; 
-    lazy[v] = inf;
+    lazy[v] = {inf, false};
 }
 
 void lazy_update(int v) {
-    if (lazy[v] != inf) {
-        if (is_set[v]) update_set(v);
+    if (lazy[v].x != inf) {
+        if (lazy[v].is_set) update_set(v);
         else update_add(v); 
     }
 }
 
-void add(int v, int tl, int tr, int l, int r, ll x) {
-    lazy_update(v); // update in ogni caso correttezza di cose sopra
+void add(int v, int tl, int tr, ll x) {
     if (tl > r or tr < l) return; 
     if (l <= tl and tr <= r) {
-        mins[v] += x;
-        sums[v] += x * (tr - tl + 1);
+        nodes[v].mmin += x;
+        nodes[v].sum += x * (tr - tl + 1);
         if (tl != tr) {
-            if (lazy[left(v)] == inf) lazy[left(v)] = 0;
-            if (lazy[right(v)] == inf) lazy[right(v)] = 0;
-            lazy[left(v)] += x;
-            lazy[right(v)] += x;
+            if (lazy[left(v)].x == inf) lazy[left(v)].x = 0;
+            if (lazy[right(v)].x == inf) lazy[right(v)].x = 0;
+            lazy[left(v)].x += x;
+            lazy[right(v)].x += x;
         }
         return;
     }
+    lazy_update(left(v));
+    lazy_update(right(v));
     int mid = (tl + tr) / 2;
-    add(left(v), tl, mid, l, r, x);
-    add(right(v), mid + 1, tr, l ,r, x);
-    mins[v] = min(mins[left(v)], mins[right(v)]);
-    sums[v] = sums[left(v)] + sums[right(v)];
+    add(left(v), tl, mid, x);
+    add(right(v), mid + 1, tr, x);
+    nodes[v] = nodes[left(v)] + nodes[right(v)];
 }
 
-void set_range(int v, int tl, int tr, int l, int r, ll x) {
-    lazy_update(v);
+void set_range(int v, int tl, int tr, ll x) {
     if (tl > r or tr < l) return; 
     if (l <= tl and tr <= r) {
-        sums[v] = x * (tr - tl + 1); 
-        mins[v] = x; 
+        nodes[v].mmin = x;
+        nodes[v].sum = x * (tr - tl + 1);
         if (tl != tr) {
-            lazy[left(v)] = lazy[right(v)] = x;
-            is_set[left(v)] = is_set[right(v)] = true;
+            lazy[left(v)].x = lazy[right(v)].x = x;
+            lazy[left(v)].is_set = lazy[right(v)].is_set = true;
         }
         return;
     }
 
-    int mid = (tl + tr) / 2;
-    set_range(left(v), tl, mid, l, r, x);
-    set_range(right(v), mid + 1, tr, l ,r, x);
-    mins[v] = min(mins[left(v)], mins[right(v)]);
-    sums[v] = sums[left(v)] + sums[right(v)];
+    lazy_update(left(v));
+    lazy_update(right(v));
+    set_range(left(v), tl, (tl + tr) / 2, x);
+    set_range(right(v), (tl + tr) / 2 + 1, tr, x);
+    nodes[v] = nodes[left(v)] + nodes[right(v)];
 }
 
-ll get_sum(int v, int l, int r, int tl, int tr) {
-    lazy_update(v);
+ll get_sum(int v, int tl, int tr) {
     if (tr < l or tl > r) return 0ll;
     if (l <= tl and tr <= r) {
-        return sums[v];
+        return nodes[v].sum;
     }
-    int mid = (tl + tr) / 2;
-    return get_sum(left(v), l, r, tl, mid) + 
-        get_sum(right(v), l, r, mid + 1, tr);
+    lazy_update(left(v));
+    lazy_update(right(v));
+    return get_sum(left(v), tl, (tl + tr) / 2) + 
+        get_sum(right(v), (tl + tr) / 2 + 1, tr);
 }
 
-ll get_min(int v, int l, int r, int tl, int tr) {
-    lazy_update(v);
+ll get_min(int v, int tl, int tr) {
     if (tr < l or tl > r) return inf; 
     if (l <= tl and tr <= r) {
-        return mins[v];
+        return nodes[v].mmin;
     }
-    int mid = (tl + tr) / 2;
-    return min(get_min(left(v), l, r, tl, mid),
-            get_min(right(v), l, r, mid + 1, tr));
+    lazy_update(left(v));
+    lazy_update(right(v));
+    return min(get_min(left(v), tl, (tl + tr) / 2),
+            get_min(right(v), (tl + tr) / 2 + 1, tr));
 }
 
 
-int lower_bound(int v, int lv, int rv, int l, int r, ll x) {
-    lazy_update(v);
+int lower_bound(int v, int lv, int rv, ll x) {
     if(lv > r or rv < l) return -1;
     if(l <= lv and rv <= r) {
-        if(mins[v] > x) return -1;
+        if(nodes[v].mmin > x) return -1;
         while(lv != rv) {
-            int mid = lv + (rv-lv)/2;
+            int mid = (lv + rv)/2;
             lazy_update(left(v));
-            if(mins[left(v)] < x) {
+            if(nodes[left(v)].mmin <= x) {
                 v = left(v);
                 rv = mid;
             } else {
@@ -159,35 +178,46 @@ int lower_bound(int v, int lv, int rv, int l, int r, ll x) {
         return lv;
     }
 
-    int mid = lv + (rv-lv)/2;
-    int rs = lower_bound(left(v), lv, mid, l, r, x);
+    lazy_update(left(v));
+    lazy_update(right(v));
+    int mid = (lv + rv)/2;
+    int rs = lower_bound(left(v), lv, mid, x);
     if(rs != -1) return rs;
-    return lower_bound(right(v), mid+1, rv, l, r, x);
+    return lower_bound(right(v), mid+1, rv, x);
 }
 
-ll get_sum(int l, int r) {
-    return get_sum(0, l, r - 1, 0, g_size - 1);
+ll get_sum(int a, int b) {
+    lazy_update(0);
+    l = a; r = b - 1;
+    return get_sum(0, 0, g_size - 1);
 }
-void add(int l, int r, ll x) {
-    add(0, 0, g_size - 1, l, r - 1, x);
+void add(int a, int b, ll x) {
+    lazy_update(0);
+    l = a; r = b - 1;
+    add(0, 0, g_size - 1, x);
 }
-void set_range(int l, int r, ll x) {
-    set_range(0, 0, g_size - 1, l, r - 1, x);
+void set_range(int a, int b, ll x) {
+    lazy_update(0);
+    l = a; r = b - 1;
+    set_range(0, 0, g_size - 1, x);
 }
-ll get_min(int l, int r) {
-    return get_min(0, l, r - 1, 0, g_size - 1);
+ll get_min(int a, int b) {
+    lazy_update(0);
+    l = a; r = b - 1;
+    return get_min(0, 0, g_size - 1);
 }
-int lower_bound(int l, int r, ll x) {
-    return lower_bound(0, 0, g_size - 1, l, r - 1, x);
+int lower_bound(int a, int b, ll x) {
+    lazy_update(0);
+    l = a; r = b - 1;
+    return lower_bound(0, 0, g_size - 1, x);
 }
 
 void init(vector<long long> a) {
-    for (ll &i : lazy) i = inf;
+    for (lazy_node &i : lazy) i.x = inf;
 
     g_size = a.size(); 
-    g_tree_size = (a.size() * 4);
+    g_tree_size = min(kmax, (int)(a.size() * 4));
     build(0, 0, g_size - 1, a);
-    g_time = 0;
 }
 
 int main() {
